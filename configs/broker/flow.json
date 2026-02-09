@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "states": {
+    "MENU": {
+      "type": "interactive_list",
+      "body": "Hola {{name}} 👋\nElegí una opción del menú:",
+      "list": {
+        "header": "BrokerBot — Menú",
+        "button_text": "Ver opciones",
+        "footer": "Tip: si no sabés qué elegir, tocá la más parecida 😄",
+        "sections": [
+          {
+            "title": "Consultas",
+            "rows": [
+              { "id": "CONSULTAR_DNI", "title": "Póliza por DNI", "description": "Buscá pólizas asociadas a un DNI" },
+              { "id": "CONSULTAR_PATENTE", "title": "Póliza por patente", "description": "Consultá cobertura por patente" },
+              { "id": "SINIESTRO", "title": "Iniciar siniestro", "description": "Te guiamos con los pasos" }
+            ]
+          },
+          {
+            "title": "Asistencia",
+            "rows": [
+              { "id": "HUMANO", "title": "Hablar con asesor", "description": "Derivación a persona" },
+              { "id": "OTRO", "title": "Otra consulta", "description": "No entra en las opciones" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "CONSULTAR_DNI": "ASK_DNI",
+        "CONSULTAR_PATENTE": "ASK_PATENTE",
+        "SINIESTRO": "SINIESTRO_INFO",
+        "HUMANO": "HUMANO",
+        "OTRO": "OTRO"
+      }
+    },
+
+    "ASK_DNI": {
+      "type": "text",
+      "body": "Dale {{name}}. Pasame tu DNI (solo números).",
+      "on_text_next": "MENU"
+    },
+
+    "ASK_PATENTE": {
+      "type": "text",
+      "body": "Ok. Pasame la patente (ej: AB123CD).",
+      "on_text_next": "MENU"
+    },
+
+    "SINIESTRO_INFO": {
+      "type": "text",
+      "body": "Para iniciar un siniestro necesito:\n1) DNI\n2) Patente\n3) Fecha del hecho\n\nMandame esos datos en un solo mensaje.",
+      "on_text_next": "MENU"
+    },
+
+    "HUMANO": {
+      "type": "text",
+      "body": "Listo 😎 Te paso con un asesor.\nMientras, contame en 1 frase qué necesitás.",
+      "on_text_next": "MENU"
+    },
+
+    "OTRO": {
+      "type": "text",
+      "body": "Perfecto. Contame tu consulta y te encamino.\n(Si es algo complejo, te derivo.)",
+      "on_text_next": "MENU"
+    }
+  }
+}

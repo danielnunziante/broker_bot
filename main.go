@@ -13,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -27,13 +30,50 @@ VERIFY_TOKEN=brokerbot_verify
 WHATSAPP_TOKEN=EAAM...
 
 # Mapeo tenant (por phone_number_id)
-$env:TENANT_BY_PHONE_NUMBER_ID="1041740029016016:broker"
-$env:DEFAULT_TENANT="broker"
+TENANT_BY_PHONE_NUMBER_ID=1041740029016016:broker
+DEFAULT_TENANT=broker
 
 # SOLO PARA DEV/PRUEBAS: fuerza a quién le respondés
-# (Meta a veces te rompe por whitelist/format)
-$env:WHATSAPP_FORCE_TO="+54111558492828"
+WHATSAPP_FORCE_TO=+54111558492828
+
+# Ambiente y puerto
+APP_ENV=dev
+PORT=8080
 */
+
+// ---------------------
+// Env loader
+// ---------------------
+
+func loadEnvFiles() {
+	env := strings.TrimSpace(os.Getenv("APP_ENV"))
+	if env == "" {
+		env = "dev"
+	}
+
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load(".env." + env)
+
+	finalEnv := os.Getenv("APP_ENV")
+	if finalEnv == "" {
+		finalEnv = env
+	}
+	log.Printf("🔧 APP_ENV=%s (cargado .env y .env.%s si existen)", finalEnv, env)
+}
+
+// ---------------------
+// Simple templating: {{name}}
+// ---------------------
+
+func renderVars(s string, vars map[string]string) string {
+	if s == "" || len(vars) == 0 {
+		return s
+	}
+	for k, v := range vars {
+		s = strings.ReplaceAll(s, "{{"+k+"}}", v)
+	}
+	return s
+}
 
 type WebhookPayload struct {
 	Object string `json:"object"`
@@ -191,7 +231,59 @@ func loadFlowConfig(tenant string) (FlowConfig, error) {
 	if len(cfg.States) == 0 {
 		return FlowConfig{}, fmt.Errorf("flow.json de %s no tiene states", tenant)
 	}
+	if err := validateFlowConfig(tenant, cfg); err != nil {
+		return FlowConfig{}, err
+	}
 	return cfg, nil
+}
+
+// ---------------------
+// Flow validation (WhatsApp limits)
+// ---------------------
+
+func runeLen(s string) int { return utf8.RuneCountInString(s) }
+
+func validateFlowConfig(tenant string, cfg FlowConfig) error {
+	var errs []string
+
+	for stateName, st := range cfg.States {
+		if st.Type != "interactive_list" || st.List == nil {
+			continue
+		}
+		l := st.List
+
+		if runeLen(l.Header) > 60 {
+			errs = append(errs, fmt.Sprintf("state=%s header > 60 (%d): %q", stateName, runeLen(l.Header), l.Header))
+		}
+		if runeLen(l.Footer) > 60 {
+			errs = append(errs, fmt.Sprintf("state=%s footer > 60 (%d): %q", stateName, runeLen(l.Footer), l.Footer))
+		}
+		if runeLen(l.ButtonText) > 20 {
+			errs = append(errs, fmt.Sprintf("state=%s button_text > 20 (%d): %q", stateName, runeLen(l.ButtonText), l.ButtonText))
+		}
+
+		for _, sec := range l.Sections {
+			if runeLen(sec.Title) > 24 {
+				errs = append(errs, fmt.Sprintf("state=%s section title > 24 (%d): %q", stateName, runeLen(sec.Title), sec.Title))
+			}
+			for _, row := range sec.Rows {
+				if row.ID == "" {
+					errs = append(errs, fmt.Sprintf("state=%s row id vacío (title=%q)", stateName, row.Title))
+				}
+				if runeLen(row.Title) > 24 {
+					errs = append(errs, fmt.Sprintf("state=%s row title > 24 (%d): %q", stateName, runeLen(row.Title), row.Title))
+				}
+				if runeLen(row.Description) > 72 {
+					errs = append(errs, fmt.Sprintf("state=%s row desc > 72 (%d): %q", stateName, runeLen(row.Description), row.Description))
+				}
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("flow inválido tenant=%s:\n- %s", tenant, strings.Join(errs, "\n- "))
+	}
+	return nil
 }
 
 // ---------------------
@@ -226,104 +318,74 @@ func NewTenantResolver() *TenantResolver {
 	return &TenantResolver{byPhoneNumberID: m, defaultTenant: def}
 }
 
-func (tr *TenantResolver) Resolve(phoneNumberID string) string {
-	if t, ok := tr.byPhoneNumberID[phoneNumberID]; ok {
+func (r *TenantResolver) Resolve(phoneNumberID string) string {
+	if t, ok := r.byPhoneNumberID[phoneNumberID]; ok && t != "" {
 		return t
 	}
-	return tr.defaultTenant
+	return r.defaultTenant
 }
 
 // ---------------------
-// WhatsApp helpers / senders
+// WhatsApp client (Cloud API)
 // ---------------------
 
-func normalizeTo(to string) string {
-	to = strings.TrimSpace(to)
-	to = strings.ReplaceAll(to, " ", "")
-	to = strings.ReplaceAll(to, "-", "")
-	return to
+type WhatsAppClient struct {
+	token      string
+	phoneID    string
+	apiBaseURL string
+	forceTo    string
 }
 
-// Dev-only override:
-// Si WHATSAPP_FORCE_TO está seteado, se usa SIEMPRE como destinatario.
-// Esto te salva del quilombo del whitelist/formato durante pruebas.
-func applyForceTo(to string) (finalTo string, forced bool) {
-	force := strings.TrimSpace(os.Getenv("WHATSAPP_FORCE_TO"))
-	if force == "" {
-		return normalizeTo(to), false
-	}
-	return normalizeTo(force), true
-}
-
-func doMetaPOST(url, token string, payload map[string]any) error {
-	b, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(b))
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error enviando mensaje: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("respuesta no OK de Meta: %s - %s", resp.Status, string(respBody))
-	}
-
-	log.Printf("✅ Enviado OK: %s\n", string(respBody))
-	return nil
-}
-
-func sendWhatsAppText(phoneNumberID, to, text string) error {
+func NewWhatsAppClient(phoneNumberID string) (*WhatsAppClient, error) {
 	token := os.Getenv("WHATSAPP_TOKEN")
 	if token == "" {
-		return fmt.Errorf("WHATSAPP_TOKEN no está seteado")
+		return nil, errors.New("WHATSAPP_TOKEN no seteado")
 	}
 
-	finalTo, forced := applyForceTo(to)
-	if forced {
-		log.Printf("⚠️ WHATSAPP_FORCE_TO activo: to_original=%s to_forzado=%s\n", normalizeTo(to), finalTo)
+	env := strings.TrimSpace(os.Getenv("APP_ENV"))
+	if env == "" {
+		env = "dev"
+	}
+	force := os.Getenv("WHATSAPP_FORCE_TO")
+	if env != "dev" {
+		force = ""
 	}
 
-	url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", apiVersion, phoneNumberID)
+	return &WhatsAppClient{
+		token:      token,
+		phoneID:    phoneNumberID,
+		apiBaseURL: fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", apiVersion, phoneNumberID),
+		forceTo:    force,
+	}, nil
+}
 
+func (c *WhatsAppClient) sendText(to string, body string) error {
+	toOriginal := to
+	if c.forceTo != "" {
+		log.Printf("⚠️ WHATSAPP_FORCE_TO activo: to_original=%s to_forzado=%s", toOriginal, c.forceTo)
+		to = c.forceTo
+	}
 	payload := map[string]any{
 		"messaging_product": "whatsapp",
-		"to":                finalTo,
+		"to":                to,
 		"type":              "text",
 		"text": map[string]any{
-			"body": text,
+			"body": body,
 		},
 	}
-	return doMetaPOST(url, token, payload)
+	return c.post(payload)
 }
 
-func sendWhatsAppList(phoneNumberID, to, body string, list *FlowList) error {
-	token := os.Getenv("WHATSAPP_TOKEN")
-	if token == "" {
-		return fmt.Errorf("WHATSAPP_TOKEN no está seteado")
-	}
-	if list == nil {
-		return errors.New("list es nil")
-	}
-	if len(list.Sections) == 0 {
-		return errors.New("list no tiene sections")
+func (c *WhatsAppClient) sendList(to string, header, body, footer, buttonText string, sections []FlowSection) error {
+	toOriginal := to
+	if c.forceTo != "" {
+		log.Printf("⚠️ WHATSAPP_FORCE_TO activo: to_original=%s to_forzado=%s", toOriginal, c.forceTo)
+		to = c.forceTo
 	}
 
-	finalTo, forced := applyForceTo(to)
-	if forced {
-		log.Printf("⚠️ WHATSAPP_FORCE_TO activo: to_original=%s to_forzado=%s\n", normalizeTo(to), finalTo)
-	}
-
-	url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", apiVersion, phoneNumberID)
-
-	// Convertimos sections/rows al formato WhatsApp
-	var sections []map[string]any
-	for _, s := range list.Sections {
-		var rows []map[string]any
+	waSections := make([]map[string]any, 0, len(sections))
+	for _, s := range sections {
+		rows := make([]map[string]any, 0, len(s.Rows))
 		for _, r := range s.Rows {
 			row := map[string]any{
 				"id":    r.ID,
@@ -334,10 +396,11 @@ func sendWhatsAppList(phoneNumberID, to, body string, list *FlowList) error {
 			}
 			rows = append(rows, row)
 		}
-		sections = append(sections, map[string]any{
+		sec := map[string]any{
 			"title": s.Title,
 			"rows":  rows,
-		})
+		}
+		waSections = append(waSections, sec)
 	}
 
 	interactive := map[string]any{
@@ -346,299 +409,356 @@ func sendWhatsAppList(phoneNumberID, to, body string, list *FlowList) error {
 			"text": body,
 		},
 		"action": map[string]any{
-			"button":   list.ButtonText,
-			"sections": sections,
+			"button":   buttonText,
+			"sections": waSections,
 		},
 	}
 
-	if strings.TrimSpace(list.Header) != "" {
+	if strings.TrimSpace(header) != "" {
 		interactive["header"] = map[string]any{
 			"type": "text",
-			"text": list.Header,
+			"text": header,
 		}
 	}
-	if strings.TrimSpace(list.Footer) != "" {
+
+	if strings.TrimSpace(footer) != "" {
 		interactive["footer"] = map[string]any{
-			"text": list.Footer,
+			"text": footer,
 		}
 	}
 
 	payload := map[string]any{
 		"messaging_product": "whatsapp",
-		"to":                finalTo,
+		"to":                to,
 		"type":              "interactive",
 		"interactive":       interactive,
 	}
 
-	return doMetaPOST(url, token, payload)
+	return c.post(payload)
 }
 
-// ---------------------
-// Bot engine
-// ---------------------
-
-type Bot struct {
-	sessions *SessionStore
-	configs  *ConfigCache
-	tenants  *TenantResolver
-}
-
-func NewBot() *Bot {
-	return &Bot{
-		sessions: NewSessionStore(),
-		configs:  NewConfigCache(),
-		tenants:  NewTenantResolver(),
-	}
-}
-
-func (b *Bot) getConfig(tenant string) (FlowConfig, error) {
-	if cfg, ok := b.configs.Get(tenant); ok {
-		return cfg, nil
-	}
-	cfg, err := loadFlowConfig(tenant)
+func (c *WhatsAppClient) post(payload map[string]any) error {
+	b, _ := json.Marshal(payload)
+	req, err := http.NewRequest("POST", c.apiBaseURL, bytes.NewReader(b))
 	if err != nil {
-		return FlowConfig{}, err
+		return err
 	}
-	b.configs.Set(tenant, cfg)
-	return cfg, nil
-}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
 
-func (b *Bot) sessionKey(tenant, waID string) string {
-	return tenant + "::" + waID
-}
-
-func (b *Bot) getState(tenant, waID string) string {
-	key := b.sessionKey(tenant, waID)
-	if s, ok := b.sessions.Get(key); ok && s.State != "" {
-		return s.State
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
 	}
-	return "MENU"
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("respuesta no OK de Meta: %s - %s", resp.Status, string(body))
+	}
+	log.Printf("✅ Enviado OK: %s", string(body))
+	return nil
 }
 
-func (b *Bot) setState(tenant, waID, state string) {
-	key := b.sessionKey(tenant, waID)
-	b.sessions.Set(key, UserSession{State: state, UpdatedAt: time.Now()})
+// ---------------------
+// Renderer
+// ---------------------
+
+type Renderer struct {
+	cache *ConfigCache
 }
 
-func applyPlaceholders(s, name, lastText string) string {
-	s = strings.ReplaceAll(s, "{{name}}", name)
-	s = strings.ReplaceAll(s, "{{last_text}}", lastText)
-	return s
+func NewRenderer(cache *ConfigCache) *Renderer {
+	return &Renderer{cache: cache}
 }
 
-func (b *Bot) render(cfg FlowConfig, phoneNumberID, to, state, name, lastText string) error {
-	st, ok := cfg.States[state]
+func (r *Renderer) RenderAndSend(tenant string, stateName string, wa *WhatsAppClient, to string, vars map[string]string) error {
+	cfg, ok := r.cache.Get(tenant)
 	if !ok {
-		return fmt.Errorf("estado %s no existe", state)
+		loaded, err := loadFlowConfig(tenant)
+		if err != nil {
+			return err
+		}
+		r.cache.Set(tenant, loaded)
+		cfg = loaded
 	}
 
-	body := applyPlaceholders(st.Body, name, lastText)
+	st, ok := cfg.States[stateName]
+	if !ok {
+		return fmt.Errorf("estado no existe: %s", stateName)
+	}
 
 	switch st.Type {
 	case "text":
-		return sendWhatsAppText(phoneNumberID, to, body)
+		return wa.sendText(to, renderVars(st.Body, vars))
 
 	case "interactive_list":
 		if st.List == nil {
-			return fmt.Errorf("state %s es list pero list=nil", state)
+			return fmt.Errorf("estado %s es interactive_list pero list es nil", stateName)
 		}
 
-		// placeholders en header/footer también
-		listCopy := *st.List
-		listCopy.Header = applyPlaceholders(listCopy.Header, name, lastText)
-		listCopy.Footer = applyPlaceholders(listCopy.Footer, name, lastText)
-		listCopy.ButtonText = applyPlaceholders(listCopy.ButtonText, name, lastText)
+		// ✅ Un solo mensaje: el body del interactive es st.Body (no mandamos texto aparte)
+		bodyText := strings.TrimSpace(st.Body)
+		if bodyText == "" {
+			bodyText = "Elegí una opción:"
+		}
+		bodyText = renderVars(bodyText, vars)
 
-		return sendWhatsAppList(phoneNumberID, to, body, &listCopy)
+		// Render vars también en UI del list
+		header := renderVars(st.List.Header, vars)
+		footer := renderVars(st.List.Footer, vars)
+		button := renderVars(st.List.ButtonText, vars)
+
+		// Render vars en secciones/rows (por si lo necesitás)
+		sections := make([]FlowSection, 0, len(st.List.Sections))
+		for _, s := range st.List.Sections {
+			ns := FlowSection{
+				Title: renderVars(s.Title, vars),
+				Rows:  make([]FlowRow, 0, len(s.Rows)),
+			}
+			for _, row := range s.Rows {
+				ns.Rows = append(ns.Rows, FlowRow{
+					ID:          row.ID,
+					Title:       renderVars(row.Title, vars),
+					Description: renderVars(row.Description, vars),
+				})
+			}
+			sections = append(sections, ns)
+		}
+
+		return wa.sendList(to, header, bodyText, footer, button, sections)
 
 	default:
-		return fmt.Errorf("tipo no soportado: %s", st.Type)
+		return fmt.Errorf("tipo de estado no soportado: %s", st.Type)
 	}
 }
 
-func (b *Bot) handle(phoneNumberID string, msg IncomingMessage, displayName string) {
-	tenant := b.tenants.Resolve(phoneNumberID)
+// ---------------------
+// App (handler)
+// ---------------------
 
-	cfg, err := b.getConfig(tenant)
-	if err != nil {
-		log.Printf("ERROR cargando config tenant=%s: %v\n", tenant, err)
+type App struct {
+	verifyToken string
+	resolver    *TenantResolver
+	sessions    *SessionStore
+	cache       *ConfigCache
+	renderer    *Renderer
+}
+
+func NewApp() (*App, error) {
+	verify := os.Getenv("VERIFY_TOKEN")
+	if verify == "" {
+		verify = "brokerbot_verify"
+	}
+	cache := NewConfigCache()
+	return &App{
+		verifyToken: verify,
+		resolver:    NewTenantResolver(),
+		sessions:    NewSessionStore(),
+		cache:       cache,
+		renderer:    NewRenderer(cache),
+	}, nil
+}
+
+func (a *App) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		a.handleVerify(w, r)
+		return
+	case "POST":
+		a.handleMessage(w, r)
+		return
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+}
+
+func (a *App) handleVerify(w http.ResponseWriter, r *http.Request) {
+	mode := r.URL.Query().Get("hub.mode")
+	token := r.URL.Query().Get("hub.verify_token")
+	challenge := r.URL.Query().Get("hub.challenge")
+
+	if mode == "subscribe" && token == a.verifyToken {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(challenge))
+		return
+	}
+	w.WriteHeader(http.StatusForbidden)
+}
+
+func (a *App) handleMessage(w http.ResponseWriter, r *http.Request) {
+	log.Printf(">> POST /webhook from %s", r.RemoteAddr)
+
+	log.Printf("POST headers=%v", r.Header)
+	rawBody, _ := io.ReadAll(r.Body)
+	log.Printf("POST body=%s", string(rawBody))
+
+	var payload WebhookPayload
+	if err := json.Unmarshal(rawBody, &payload); err != nil {
+		log.Printf("ERROR unmarshal: %v", err)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	waID := msg.From
-	state := b.getState(tenant, waID)
+	for _, e := range payload.Entry {
+		for _, ch := range e.Changes {
+			phoneID := ch.Value.Metadata.PhoneNumberID
+			tenant := a.resolver.Resolve(phoneID)
 
-	log.Printf("🤖 tenant=%s wa_id=%s state=%s type=%s name=%s\n", tenant, waID, state, msg.Type, displayName)
+			if len(ch.Value.Messages) == 0 {
+				continue
+			}
 
-	cur, ok := cfg.States[state]
+			for _, msg := range ch.Value.Messages {
+				waID := msg.From
+				name := ""
+				if len(ch.Value.Contacts) > 0 {
+					name = strings.TrimSpace(ch.Value.Contacts[0].Profile.Name)
+				}
+				if name == "" {
+					name = "ahí"
+				}
+
+				vars := map[string]string{
+					"name": name,
+				}
+
+				sessKey := tenant + ":" + waID
+				sess, ok := a.sessions.Get(sessKey)
+				if !ok || sess.State == "" {
+					sess = UserSession{State: "MENU", UpdatedAt: time.Now()}
+					a.sessions.Set(sessKey, sess)
+				}
+
+				log.Printf("🤖 tenant=%s wa_id=%s state=%s type=%s name=%s", tenant, waID, sess.State, msg.Type, name)
+
+				waClient, err := NewWhatsAppClient(phoneID)
+				if err != nil {
+					log.Printf("ERROR WhatsApp client: %v", err)
+					continue
+				}
+
+				nextState, handled, err := a.processMessage(tenant, sess.State, msg)
+				if err != nil {
+					log.Printf("ERROR procesando msg: %v", err)
+					_ = waClient.sendText(waID, "Perdón, hubo un error. Probá de nuevo.")
+					continue
+				}
+
+				if !handled {
+					nextState = "MENU"
+				}
+
+				a.sessions.Set(sessKey, UserSession{State: nextState, UpdatedAt: time.Now()})
+
+				if err := a.renderer.RenderAndSend(tenant, nextState, waClient, waID, vars); err != nil {
+					log.Printf("ERROR render %s: %v", nextState, err)
+					_ = waClient.sendText(waID, "Perdón, hubo un problema mostrando el menú.")
+				}
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (a *App) processMessage(tenant string, state string, msg IncomingMessage) (next string, handled bool, err error) {
+	cfg, ok := a.cache.Get(tenant)
 	if !ok {
-		state = "MENU"
-		cur = cfg.States[state]
-		b.setState(tenant, waID, state)
+		loaded, err2 := loadFlowConfig(tenant)
+		if err2 != nil {
+			return "", false, err2
+		}
+		a.cache.Set(tenant, loaded)
+		cfg = loaded
+	}
+
+	st, ok := cfg.States[state]
+	if !ok {
+		return "MENU", false, nil
 	}
 
 	switch msg.Type {
 	case "text":
-		userText := ""
-		if msg.Text != nil {
-			userText = strings.TrimSpace(msg.Text.Body)
+		if msg.Text == nil {
+			return "MENU", false, nil
 		}
-		log.Printf("📩 TEXT: %q\n", userText)
+		txt := strings.TrimSpace(msg.Text.Body)
+		log.Printf("📩 TEXT: %q", txt)
 
-		// Si el state actual define transición por texto, vamos ahí
-		if cur.OnTextNext != "" {
-			next := cur.OnTextNext
-			b.setState(tenant, waID, next)
-			if err := b.render(cfg, phoneNumberID, waID, next, displayName, userText); err != nil {
-				log.Printf("ERROR render: %v\n", err)
-			}
-			return
+		if strings.EqualFold(txt, "menu") {
+			return "MENU", true, nil
 		}
 
-		// si el user mete texto en el menú, lo re-mostramos
-		if state == "MENU" {
-			if err := sendWhatsAppText(phoneNumberID, waID, "Elegí una opción de la lista 👇"); err != nil {
-				log.Printf("ERROR send text: %v\n", err)
-			}
-			if err := b.render(cfg, phoneNumberID, waID, "MENU", displayName, userText); err != nil {
-				log.Printf("ERROR render MENU: %v\n", err)
-			}
-			return
+		if st.OnTextNext != "" {
+			return st.OnTextNext, true, nil
 		}
-
-		if err := sendWhatsAppText(phoneNumberID, waID, "No te entendí 😅. Volvamos al menú."); err != nil {
-			log.Printf("ERROR send text: %v\n", err)
-		}
-		b.setState(tenant, waID, "MENU")
-		if err := b.render(cfg, phoneNumberID, waID, "MENU", displayName, userText); err != nil {
-			log.Printf("ERROR render MENU: %v\n", err)
-		}
-		return
+		return "MENU", false, nil
 
 	case "interactive":
-		selectedID := ""
-		if msg.Interactive != nil && msg.Interactive.ListReply != nil {
-			selectedID = msg.Interactive.ListReply.ID
-		}
-		log.Printf("🟩 LIST SELECT id=%s\n", selectedID)
-
-		if selectedID == "" {
-			if err := sendWhatsAppText(phoneNumberID, waID, "Eso no me llegó bien 😬. Probá de nuevo."); err != nil {
-				log.Printf("ERROR send text: %v\n", err)
-			}
-			if err := b.render(cfg, phoneNumberID, waID, "MENU", displayName, ""); err != nil {
-				log.Printf("ERROR render MENU: %v\n", err)
-			}
-			return
+		if msg.Interactive == nil {
+			return "MENU", false, nil
 		}
 
-		next, ok := cur.OnSelectNext[selectedID]
-		if !ok || next == "" {
-			if err := sendWhatsAppText(phoneNumberID, waID, "Esa opción no existe (todavía) 😅. Volvemos al menú."); err != nil {
-				log.Printf("ERROR send text: %v\n", err)
+		switch msg.Interactive.Type {
+		case "list_reply":
+			if msg.Interactive.ListReply == nil {
+				return "MENU", false, nil
 			}
-			b.setState(tenant, waID, "MENU")
-			if err := b.render(cfg, phoneNumberID, waID, "MENU", displayName, ""); err != nil {
-				log.Printf("ERROR render MENU: %v\n", err)
-			}
-			return
-		}
+			rowID := msg.Interactive.ListReply.ID
+			log.Printf("🧾 LIST_REPLY: id=%s title=%s", rowID, msg.Interactive.ListReply.Title)
 
-		b.setState(tenant, waID, next)
-		if err := b.render(cfg, phoneNumberID, waID, next, displayName, ""); err != nil {
-			log.Printf("ERROR render: %v\n", err)
+			if st.OnSelectNext != nil {
+				if ns, ok := st.OnSelectNext[rowID]; ok && ns != "" {
+					return ns, true, nil
+				}
+			}
+			return "MENU", false, nil
+
+		case "button_reply":
+			if msg.Interactive.ButtonReply == nil {
+				return "MENU", false, nil
+			}
+			btnID := msg.Interactive.ButtonReply.ID
+			log.Printf("🔘 BUTTON_REPLY: id=%s title=%s", btnID, msg.Interactive.ButtonReply.Title)
+
+			if st.OnSelectNext != nil {
+				if ns, ok := st.OnSelectNext[btnID]; ok && ns != "" {
+					return ns, true, nil
+				}
+			}
+			return "MENU", false, nil
+
+		default:
+			return "MENU", false, nil
 		}
-		return
 
 	default:
-		log.Printf("Mensaje no soportado: type=%s\n", msg.Type)
-		if err := sendWhatsAppText(phoneNumberID, waID, "Por ahora solo entiendo texto y lista 🙏"); err != nil {
-			log.Printf("ERROR send text: %v\n", err)
-		}
-		if err := b.render(cfg, phoneNumberID, waID, "MENU", displayName, ""); err != nil {
-			log.Printf("ERROR render MENU: %v\n", err)
-		}
-		return
+		return "MENU", false, nil
 	}
 }
 
 // ---------------------
-// HTTP server
+// main
 // ---------------------
-
-type Server struct {
-	bot *Bot
-}
-
-func NewServer() *Server {
-	return &Server{bot: NewBot()}
-}
-
-func (s *Server) webhookHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf(">> %s %s from %s\n", r.Method, r.URL.String(), r.RemoteAddr)
-
-	// GET verify
-	if r.Method == http.MethodGet {
-		verifyToken := r.URL.Query().Get("hub.verify_token")
-		challenge := r.URL.Query().Get("hub.challenge")
-
-		if verifyToken == os.Getenv("VERIFY_TOKEN") {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, challenge)
-			return
-		}
-
-		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprint(w, "forbidden")
-		return
-	}
-
-	// POST events
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("ERROR leyendo body: %v\n", err)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "bad request")
-		return
-	}
-	defer r.Body.Close()
-
-	log.Printf("POST headers=%v\n", r.Header)
-	log.Printf("POST body=%s\n", string(body))
-
-	// respond fast
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, "ok")
-
-	var payload WebhookPayload
-	if err := json.Unmarshal(body, &payload); err != nil {
-		log.Printf("ERROR parseando JSON: %v\n", err)
-		return
-	}
-
-	if len(payload.Entry) == 0 || len(payload.Entry[0].Changes) == 0 {
-		return
-	}
-
-	val := payload.Entry[0].Changes[0].Value
-	phoneNumberID := val.Metadata.PhoneNumberID
-	if phoneNumberID == "" || len(val.Messages) == 0 {
-		return
-	}
-
-	displayName := "che"
-	if len(val.Contacts) > 0 && val.Contacts[0].Profile.Name != "" {
-		displayName = val.Contacts[0].Profile.Name
-	}
-
-	msg := val.Messages[0]
-	s.bot.handle(phoneNumberID, msg, displayName)
-}
 
 func main() {
-	srv := NewServer()
-	http.HandleFunc("/webhook", srv.webhookHandler)
+	loadEnvFiles()
 
-	log.Println("Webhook escuchando en :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	app, err := NewApp()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	http.HandleFunc("/webhook", app.handleWebhook)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	addr := ":" + port
+	log.Printf("Webhook escuchando en %s", addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }

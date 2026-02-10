@@ -3,66 +3,588 @@
   "states": {
     "MENU": {
       "type": "interactive_list",
-      "body": "Hola {{name}} 👋\nElegí una opción del menú:",
+      "body": "Hola {{name}} 👋\nSoy el asistente de *COBERSER S.A.*\n\nAntes de empezar, ¿ya sos cliente?",
       "list": {
-        "header": "BrokerBot — Menú",
-        "button_text": "Ver opciones",
-        "footer": "Tip: si no sabés qué elegir, tocá la más parecida 😄",
+        "header": "COBERSER - Inicio",
+        "button_text": "Elegir opción",
+        "footer": "",
         "sections": [
           {
-            "title": "Consultas",
+            "title": "Identificación",
             "rows": [
-              { "id": "CONSULTAR_DNI", "title": "Póliza por DNI", "description": "Buscá pólizas asociadas a un DNI" },
-              { "id": "CONSULTAR_PATENTE", "title": "Póliza por patente", "description": "Consultá cobertura por patente" },
-              { "id": "SINIESTRO", "title": "Iniciar siniestro", "description": "Te guiamos con los pasos" }
-            ]
-          },
-          {
-            "title": "Asistencia",
-            "rows": [
-              { "id": "HUMANO", "title": "Hablar con asesor", "description": "Derivación a persona" },
-              { "id": "OTRO", "title": "Otra consulta", "description": "No entra en las opciones" }
+              { "id": "SOY_CLIENTE", "title": "Sí, ya soy cliente", "description": "Consultas de póliza, pagos y siniestros" },
+              { "id": "NO_SOY_CLIENTE", "title": "No, quiero información", "description": "Cotizar o conocer coberturas" }
             ]
           }
         ]
       },
       "on_select_next": {
-        "CONSULTAR_DNI": "ASK_DNI",
-        "CONSULTAR_PATENTE": "ASK_PATENTE",
-        "SINIESTRO": "SINIESTRO_INFO",
-        "HUMANO": "HUMANO",
-        "OTRO": "OTRO"
+        "SOY_CLIENTE": "CLIENT_MENU",
+        "NO_SOY_CLIENTE": "ABOUT_COBERSER"
       }
     },
 
-    "ASK_DNI": {
-      "type": "text",
-      "body": "Dale {{name}}. Pasame tu DNI (solo números).",
-      "on_text_next": "MENU"
+    "ABOUT_COBERSER": {
+      "type": "interactive_list",
+      "body": "Genial 😊\n\nEn *COBERSER* trabajamos desde 2003 acompañando a personas y empresas con *soluciones de seguros patrimoniales*, *ART* y *Vida*, con el respaldo de compañías líderes del mercado.\n\n¿Sobre qué te interesa consultar?",
+      "list": {
+        "header": "COBERSER - Nuevos clientes",
+        "button_text": "Ver servicios",
+        "footer": "Elegí lo más parecido a lo que buscás.",
+        "sections": [
+          {
+            "title": "Para individuos",
+            "rows": [
+              { "id": "PROSPECT_AUTO_MOTO", "title": "Auto / Moto", "description": "Coberturas y cotización" },
+              { "id": "PROSPECT_HOGAR", "title": "Hogar", "description": "Robo, incendio, responsabilidad, etc." },
+              { "id": "PROSPECT_SALUD", "title": "Medicina prepaga", "description": "Planes y asesoramiento" },
+              { "id": "PROSPECT_VIDA", "title": "Vida", "description": "Vida individual o coberturas asociadas" }
+            ]
+          },
+          {
+            "title": "Para empresas",
+            "rows": [
+              { "id": "PROSPECT_ART", "title": "ART / RC Patronal", "description": "Cobertura para empleados y empleador" },
+              { "id": "PROSPECT_COMERCIO", "title": "Integral de Comercio", "description": "Cobertura para local/actividad" },
+              { "id": "PROSPECT_EMPRESA_RIESGOS", "title": "Riesgos y transporte", "description": "Todo riesgo operativo, técnico, transporte, etc." },
+              { "id": "PROSPECT_CYBER", "title": "Riesgo cibernético", "description": "Cobertura para incidentes y asistencia" }
+            ]
+          },
+          {
+            "title": "Volver",
+            "rows": [
+              { "id": "VOLVER_MENU", "title": "Volver al inicio", "description": "Soy cliente / no soy cliente" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "PROSPECT_AUTO_MOTO": "LEAD_INTRO_AUTO_MOTO",
+        "PROSPECT_HOGAR": "LEAD_INTRO_HOGAR",
+        "PROSPECT_SALUD": "LEAD_INTRO_SALUD",
+        "PROSPECT_VIDA": "LEAD_INTRO_VIDA",
+        "PROSPECT_ART": "LEAD_INTRO_ART",
+        "PROSPECT_COMERCIO": "LEAD_INTRO_COMERCIO",
+        "PROSPECT_EMPRESA_RIESGOS": "LEAD_INTRO_EMPRESA_RIESGOS",
+        "PROSPECT_CYBER": "LEAD_INTRO_CYBER",
+        "VOLVER_MENU": "MENU"
+      }
     },
 
-    "ASK_PATENTE": {
+    "LEAD_INTRO_AUTO_MOTO": {
       "type": "text",
-      "body": "Ok. Pasame la patente (ej: AB123CD).",
-      "on_text_next": "MENU"
+      "body": "Perfecto 🚗🏍️\nPara cotizar *Auto/Moto* necesito algunos datos.\n\nPor favor mandame TODO junto en un solo mensaje (copiá y completá):\n\n- Nombre y apellido:\n- DNI:\n- Localidad/Provincia:\n- Auto o Moto:\n- Marca / Modelo / Año:\n- ¿Uso particular o laboral?:\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
     },
 
-    "SINIESTRO_INFO": {
+    "LEAD_INTRO_HOGAR": {
       "type": "text",
-      "body": "Para iniciar un siniestro necesito:\n1) DNI\n2) Patente\n3) Fecha del hecho\n\nMandame esos datos en un solo mensaje.",
-      "on_text_next": "MENU"
+      "body": "Dale 🏠\nPara cotizar *Hogar* mandame en un solo mensaje:\n\n- Nombre y apellido:\n- DNI:\n- Localidad/Provincia:\n- Tipo de vivienda (casa/depto):\n- ¿Propietario o inquilino?:\n- Metros aprox (si sabés):\n- ¿Qué te interesa cubrir? (incendio/robo/RC/electro/etc.):\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_INTRO_SALUD": {
+      "type": "text",
+      "body": "Ok 🩺\nPara *Medicina prepaga* mandame en un solo mensaje:\n\n- Nombre y apellido:\n- DNI:\n- Edad:\n- Localidad/Provincia:\n- ¿Para cuántas personas?:\n- ¿Tenés prepaga actualmente? (sí/no):\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_INTRO_VIDA": {
+      "type": "text",
+      "body": "Bien 💙\nPara *Seguro de Vida* mandame en un solo mensaje:\n\n- Nombre y apellido:\n- DNI:\n- Edad:\n- Localidad/Provincia:\n- ¿Monto aproximado a asegurar? (si sabés):\n- ¿Es para vos o para un grupo/empresa?:\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_INTRO_ART": {
+      "type": "text",
+      "body": "Perfecto 👷‍♀️👷\nPara *ART / RC Patronal* mandame en un solo mensaje:\n\n- Razón social:\n- CUIT:\n- Rubro/actividad:\n- Cantidad de empleados:\n- Localidad/Provincia:\n- Nombre y apellido de contacto:\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_INTRO_COMERCIO": {
+      "type": "text",
+      "body": "Dale 🏪\nPara *Integral de Comercio* mandame en un solo mensaje:\n\n- Razón social (si aplica):\n- CUIT (si aplica):\n- Actividad/rubro:\n- Dirección/localidad:\n- ¿Local propio o alquilado?:\n- ¿Qué querés cubrir? (incendio/robo/RC/mercadería/etc.):\n- Nombre y apellido de contacto:\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_INTRO_EMPRESA_RIESGOS": {
+      "type": "text",
+      "body": "Entendido 🧰🚚\nPara *Riesgos / Técnico / Transporte* mandame en un solo mensaje:\n\n- Empresa / Razón social:\n- CUIT:\n- Tipo de cobertura buscada (técnico / todo riesgo operativo / transporte / otra):\n- Breve descripción del riesgo o bien asegurado:\n- Localidad/Provincia:\n- Nombre y apellido de contacto:\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_INTRO_CYBER": {
+      "type": "text",
+      "body": "Ok 🔐\nPara *Riesgo cibernético* mandame en un solo mensaje:\n\n- Empresa / Razón social:\n- CUIT:\n- Actividad:\n- Cantidad aprox de PCs/usuarios (si sabés):\n- ¿Tienen e-commerce o base de datos de clientes? (sí/no):\n- Localidad/Provincia:\n- Nombre y apellido de contacto:\n- Teléfono alternativo (opcional):",
+      "on_text_next": "LEAD_CONTACT_PREF"
+    },
+
+    "LEAD_CONTACT_PREF": {
+      "type": "interactive_list",
+      "body": "¡Gracias! ✅\n\n¿Cómo preferís que te contactemos para avanzar con la cotización?",
+      "list": {
+        "header": "COBERSER - Contacto",
+        "button_text": "Elegir",
+        "footer": "Elegí una opción.",
+        "sections": [
+          {
+            "title": "Preferencia",
+            "rows": [
+              { "id": "CONTACT_WPP", "title": "Por WhatsApp", "description": "Seguimos por acá" },
+              { "id": "CONTACT_CALL", "title": "Llamada telefónica", "description": "Te llamamos en un horario" },
+              { "id": "CONTACT_EMAIL", "title": "Email", "description": "Te pedimos tu correo" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "CONTACT_WPP": "LEAD_DONE_WPP",
+        "CONTACT_CALL": "LEAD_CALL_TIME",
+        "CONTACT_EMAIL": "LEAD_EMAIL_ASK"
+      }
+    },
+
+    "LEAD_CALL_TIME": {
+      "type": "text",
+      "body": "Perfecto 📞\nDecime en un mensaje:\n\n- Horario preferido (ej: 9–13 / 14–18)\n- Día (hoy/mañana o el que te quede cómodo)\n- Número al que debemos llamar (si es distinto a este WhatsApp)",
+      "on_text_next": "LEAD_DONE_CALL"
+    },
+
+    "LEAD_EMAIL_ASK": {
+      "type": "text",
+      "body": "Dale ✉️\nPasame tu email en un solo mensaje (ej: nombre@dominio.com).",
+      "on_text_next": "LEAD_DONE_EMAIL"
+    },
+
+    "LEAD_DONE_WPP": {
+      "type": "interactive_list",
+      "body": "Listo 🙌\nYa registré tu consulta. En breve te respondemos por este WhatsApp con opciones y/o preguntas finales.\n\n¿Querés hacer algo más ahora?",
+      "list": {
+        "header": "COBERSER - Siguiente paso",
+        "button_text": "Ver opciones",
+        "footer": "Podés volver cuando quieras.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "OTRO_SERVICIO", "title": "Consultar otro servicio", "description": "Ver servicios nuevamente" },
+              { "id": "FIN", "title": "Finalizar", "description": "Eso era todo" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "OTRO_SERVICIO": "ABOUT_COBERSER",
+        "FIN": "END"
+      }
+    },
+
+    "LEAD_DONE_CALL": {
+      "type": "interactive_list",
+      "body": "Perfecto ✅\nQuedó agendado para que un asesor te contacte en el horario que indicaste.\n\n¿Querés consultar otro servicio mientras tanto?",
+      "list": {
+        "header": "COBERSER - Listo",
+        "button_text": "Elegir",
+        "footer": "Gracias por escribirnos.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "OTRO_SERVICIO", "title": "Sí, otro servicio", "description": "Volver a servicios" },
+              { "id": "FIN", "title": "No, gracias", "description": "Finalizar" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "OTRO_SERVICIO": "ABOUT_COBERSER",
+        "FIN": "END"
+      }
+    },
+
+    "LEAD_DONE_EMAIL": {
+      "type": "interactive_list",
+      "body": "¡Gracias! ✅\nTe contactaremos por email con la propuesta o para pedirte algún dato adicional.\n\n¿Querés consultar otro servicio?",
+      "list": {
+        "header": "COBERSER - Listo",
+        "button_text": "Elegir",
+        "footer": "Seguimos cuando quieras.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "OTRO_SERVICIO", "title": "Sí, otro servicio", "description": "Volver a servicios" },
+              { "id": "FIN", "title": "No, gracias", "description": "Finalizar" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "OTRO_SERVICIO": "ABOUT_COBERSER",
+        "FIN": "END"
+      }
+    },
+
+    "CLIENT_MENU": {
+      "type": "interactive_list",
+      "body": "Perfecto {{name}} ✅\n¿Qué necesitás consultar hoy?",
+      "list": {
+        "header": "COBERSER - Clientes",
+        "button_text": "Ver opciones",
+        "footer": "Te voy a pedir algunos datos para ubicar tu caso.",
+        "sections": [
+          {
+            "title": "Autoservicio",
+            "rows": [
+              { "id": "CLIENT_POLICY_STATUS", "title": "Estado de mi póliza", "description": "Vigencia, cobertura, aseguradora" },
+              { "id": "CLIENT_PAYMENTS", "title": "Pagos / Cuotas", "description": "Saldo, vencimientos, medios de pago" },
+              { "id": "CLIENT_CLAIMS_STATUS", "title": "Mis siniestros", "description": "Estado de un siniestro existente" },
+              { "id": "CLIENT_NEW_CLAIM", "title": "Nuevo siniestro", "description": "Informar nuevo siniestro" }
+            ]
+          },
+          {
+            "title": "Ayuda",
+            "rows": [
+              { "id": "CLIENT_CANT_FIND", "title": "No encuentro mis datos", "description": "Si no recordás póliza/patente/etc." },
+              { "id": "VOLVER_MENU", "title": "Volver al inicio", "description": "Soy cliente / no soy cliente" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "CLIENT_POLICY_STATUS": "CLIENT_ID_ASK_POLICY",
+        "CLIENT_PAYMENTS": "CLIENT_ID_ASK_PAYMENTS",
+        "CLIENT_CLAIMS_STATUS": "CLIENT_ID_ASK_CLAIMS_STATUS",
+        "CLIENT_NEW_CLAIM": "CLAIM_URGENT_CHECK",
+        "CLIENT_CANT_FIND": "CLIENT_CANT_FIND_MENU",
+        "VOLVER_MENU": "MENU"
+      }
+    },
+
+    "CLIENT_ID_ASK_POLICY": {
+      "type": "text",
+      "body": "Para buscar tu póliza, mandame en un solo mensaje *dos datos*:\n\n1) DNI\n2) Uno de estos: Nº de póliza / Patente / Email\n\nEjemplo:\nDNI: 12345678\nPatente: AB123CD",
+      "on_text_next": "CLIENT_POLICY_RESULT"
+    },
+
+    "CLIENT_POLICY_RESULT": {
+      "type": "interactive_list",
+      "body": "¡Gracias! ✅\nYa registré tu consulta de *estado de póliza* para que te respondamos con toda la información actualizada.\n\n¿Querés hacer otra consulta?",
+      "list": {
+        "header": "COBERSER - Clientes",
+        "button_text": "Elegir",
+        "footer": "Seguimos por acá.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú", "description": "Ver opciones" },
+              { "id": "FIN", "title": "Finalizar", "description": "Eso era todo" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "VOLVER_CLIENT_MENU": "CLIENT_MENU",
+        "FIN": "END"
+      }
+    },
+
+    "CLIENT_ID_ASK_PAYMENTS": {
+      "type": "text",
+      "body": "Ok 💳\nPara consultar *pagos/cuotas*, mandame en un solo mensaje:\n\n1) DNI\n2) Nº de póliza o Patente\n\nEjemplo:\nDNI: 12345678\nPoliza: 00-123456",
+      "on_text_next": "CLIENT_PAYMENTS_RESULT"
+    },
+
+    "CLIENT_PAYMENTS_RESULT": {
+      "type": "interactive_list",
+      "body": "Listo ✅\nRegistré tu consulta de *pagos/cuotas*. Te respondemos con vencimientos, estado y medios de pago disponibles.\n\n¿Algo más?",
+      "list": {
+        "header": "COBERSER - Clientes",
+        "button_text": "Elegir",
+        "footer": "Gracias.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú", "description": "Ver opciones" },
+              { "id": "FIN", "title": "Finalizar", "description": "Eso era todo" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "VOLVER_CLIENT_MENU": "CLIENT_MENU",
+        "FIN": "END"
+      }
+    },
+
+    "CLIENT_ID_ASK_CLAIMS_STATUS": {
+      "type": "text",
+      "body": "Dale 🧾\nPara ver el *estado de un siniestro existente*, mandame en un solo mensaje:\n\n- DNI\n- Nº de siniestro (si lo tenés) o Patente / Nº de póliza\n- Fecha aproximada del hecho\n\nEjemplo:\nDNI 12345678 | Patente AB123CD | Hecho: 12/01/2026",
+      "on_text_next": "CLIENT_CLAIMS_STATUS_RESULT"
+    },
+
+    "CLIENT_CLAIMS_STATUS_RESULT": {
+      "type": "interactive_list",
+      "body": "Gracias ✅\nRegistré tu consulta del *estado de siniestro*. Te respondemos con el avance y los próximos pasos.\n\n¿Algo más?",
+      "list": {
+        "header": "COBERSER - Clientes",
+        "button_text": "Elegir",
+        "footer": "Seguimos en este chat.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú", "description": "Ver opciones" },
+              { "id": "FIN", "title": "Finalizar", "description": "Eso era todo" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "VOLVER_CLIENT_MENU": "CLIENT_MENU",
+        "FIN": "END"
+      }
+    },
+
+    "CLAIM_URGENT_CHECK": {
+      "type": "interactive_list",
+      "body": "Vamos con el siniestro 🚨\nPrimero: ¿hay *lesionados*, riesgo inmediato o emergencia?",
+      "list": {
+        "header": "COBERSER - Siniestros",
+        "button_text": "Elegir",
+        "footer": "Si estás en peligro, priorizá tu seguridad.",
+        "sections": [
+          {
+            "title": "Urgencia",
+            "rows": [
+              { "id": "CLAIM_URGENT_YES", "title": "Sí, es urgente", "description": "Lesiones / riesgo / emergencia" },
+              { "id": "CLAIM_URGENT_NO", "title": "No, no es urgente", "description": "Podemos cargar el siniestro" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "CLAIM_URGENT_YES": "CLAIM_URGENT_TEXT",
+        "CLAIM_URGENT_NO": "CLAIM_TYPE"
+      }
+    },
+
+    "CLAIM_URGENT_TEXT": {
+      "type": "text",
+      "body": "⚠️ Importante: si hay lesionados o riesgo, llamá a emergencias de inmediato.\n\nCuando puedas, mandame:\n- DNI\n- Patente o Nº de póliza\n- Qué pasó (1–2 líneas)\n\nCon eso priorizamos el caso.",
+      "on_text_next": "CLAIM_URGENT_RECEIVED"
+    },
+
+    "CLAIM_URGENT_RECEIVED": {
+      "type": "interactive_list",
+      "body": "Recibido ✅\nRegistré el siniestro como *urgente* para gestión prioritaria.\n\n¿Querés seguir cargando más detalles ahora?",
+      "list": {
+        "header": "COBERSER - Siniestros",
+        "button_text": "Elegir",
+        "footer": "Si podés, ayuda mucho sumar datos/fotos.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "CLAIM_CONTINUE", "title": "Sí, cargar más detalles", "description": "Seguimos con el formulario" },
+              { "id": "CLAIM_LATER", "title": "No, por ahora no", "description": "Volver al menú" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "CLAIM_CONTINUE": "CLAIM_TYPE",
+        "CLAIM_LATER": "CLIENT_MENU"
+      }
+    },
+
+    "CLAIM_TYPE": {
+      "type": "interactive_list",
+      "body": "¿De qué tipo es el siniestro?",
+      "list": {
+        "header": "COBERSER - Nuevo siniestro",
+        "button_text": "Elegir tipo",
+        "footer": "Elegí el que aplique.",
+        "sections": [
+          {
+            "title": "Tipo",
+            "rows": [
+              { "id": "CLAIM_AUTO", "title": "Automotor / Moto", "description": "Choque, robo, incendio, etc." },
+              { "id": "CLAIM_HOGAR", "title": "Hogar", "description": "Robo, incendio, daños, RC" },
+              { "id": "CLAIM_COMERCIO", "title": "Comercio / Empresa", "description": "Daños, robo, RC, etc." },
+              { "id": "CLAIM_ART", "title": "ART / Laboral", "description": "Accidente laboral" },
+              { "id": "CLAIM_OTRO", "title": "Otro", "description": "Transporte, técnico, cyber, etc." }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "CLAIM_AUTO": "CLAIM_AUTO_COLLECT",
+        "CLAIM_HOGAR": "CLAIM_HOGAR_COLLECT",
+        "CLAIM_COMERCIO": "CLAIM_COMERCIO_COLLECT",
+        "CLAIM_ART": "CLAIM_ART_COLLECT",
+        "CLAIM_OTRO": "CLAIM_OTHER_COLLECT"
+      }
+    },
+
+    "CLAIM_AUTO_COLLECT": {
+      "type": "text",
+      "body": "Ok 🚗\nMandame TODO junto en un mensaje (copiá y completá):\n\n- DNI:\n- Patente:\n- Nº de póliza (si lo tenés):\n- Fecha y hora del hecho:\n- Lugar (calle/localidad):\n- Qué pasó (breve):\n- ¿Hay terceros? (sí/no):\n- Si hay terceros: nombre, patente y aseguradora (si la tenés):\n- Fotos (si tenés): podés adjuntarlas acá",
+      "on_text_next": "CLAIM_RECEIVED"
+    },
+
+    "CLAIM_HOGAR_COLLECT": {
+      "type": "text",
+      "body": "Dale 🏠\nMandame en un mensaje:\n\n- DNI:\n- Dirección del riesgo:\n- Nº de póliza (si lo tenés):\n- Fecha y hora del hecho:\n- Qué pasó (breve):\n- ¿Hubo denuncia policial? (sí/no):\n- Fotos / video (si tenés): adjuntalos acá",
+      "on_text_next": "CLAIM_RECEIVED"
+    },
+
+    "CLAIM_COMERCIO_COLLECT": {
+      "type": "text",
+      "body": "Ok 🏪\nMandame en un mensaje:\n\n- Razón social / CUIT:\n- DNI del contacto:\n- Dirección del comercio:\n- Nº de póliza (si lo tenés):\n- Fecha y hora del hecho:\n- Qué pasó (breve):\n- ¿Hubo denuncia? (sí/no):\n- Fotos / documentación (si tenés): adjuntalo acá",
+      "on_text_next": "CLAIM_RECEIVED"
+    },
+
+    "CLAIM_ART_COLLECT": {
+      "type": "text",
+      "body": "Entendido 👷\nMandame en un mensaje:\n\n- DNI del trabajador:\n- Empresa / CUIT:\n- Fecha y hora del accidente:\n- Lugar:\n- Qué pasó (breve):\n- ¿Requirió atención médica? (sí/no):\n- Teléfono de contacto:",
+      "on_text_next": "CLAIM_RECEIVED"
+    },
+
+    "CLAIM_OTHER_COLLECT": {
+      "type": "text",
+      "body": "Ok ✅\nMandame en un mensaje:\n\n- DNI o CUIT:\n- Nº de póliza (si lo tenés):\n- Tipo (transporte/técnico/cyber/otro):\n- Fecha y hora:\n- Lugar:\n- Qué pasó (breve):\n- Adjuntos (si tenés):",
+      "on_text_next": "CLAIM_RECEIVED"
+    },
+
+    "CLAIM_RECEIVED": {
+      "type": "interactive_list",
+      "body": "Listo ✅\nRegistré tu *nuevo siniestro*.\n\nPara avanzar más rápido, si tenés *fotos, denuncia o documentación*, podés enviarlas en este chat.\n\n¿Querés hacer algo más?",
+      "list": {
+        "header": "COBERSER - Siniestros",
+        "button_text": "Elegir",
+        "footer": "Gracias por la info.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú", "description": "Otras consultas" },
+              { "id": "FIN", "title": "Finalizar", "description": "Eso era todo" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "VOLVER_CLIENT_MENU": "CLIENT_MENU",
+        "FIN": "END"
+      }
+    },
+
+    "CLIENT_CANT_FIND_MENU": {
+      "type": "interactive_list",
+      "body": "No pasa nada 🙂\nProbemos ubicarte con otra combinación de datos.\n¿Qué tenés a mano?",
+      "list": {
+        "header": "COBERSER - Buscar datos",
+        "button_text": "Elegir",
+        "footer": "Mientras más datos, mejor.",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "FIND_WITH_DNI", "title": "Tengo DNI", "description": "Buscamos por DNI + algo más" },
+              { "id": "FIND_WITH_PATENTE", "title": "Tengo patente", "description": "Buscamos por patente + algo más" },
+              { "id": "FIND_WITH_EMAIL", "title": "Tengo email", "description": "Buscamos por email + algo más" },
+              { "id": "FIND_NONE", "title": "No tengo datos ahora", "description": "Dejo un mensaje y seguimos después" }
+            ]
+          },
+          {
+            "title": "Volver",
+            "rows": [
+              { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú", "description": "Atrás" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "FIND_WITH_DNI": "FIND_DNI_ASK",
+        "FIND_WITH_PATENTE": "FIND_PATENTE_ASK",
+        "FIND_WITH_EMAIL": "FIND_EMAIL_ASK",
+        "FIND_NONE": "FIND_NONE_TEXT",
+        "VOLVER_CLIENT_MENU": "CLIENT_MENU"
+      }
+    },
+
+    "FIND_DNI_ASK": {
+      "type": "text",
+      "body": "Mandame en un mensaje:\n\n- DNI\n- Nombre y apellido (como figura)\n- Qué querías consultar (póliza/pagos/siniestro)",
+      "on_text_next": "FIND_RECEIVED"
+    },
+
+    "FIND_PATENTE_ASK": {
+      "type": "text",
+      "body": "Mandame en un mensaje:\n\n- Patente\n- DNI (si lo sabés) o Nombre y apellido\n- Qué querías consultar (póliza/pagos/siniestro)",
+      "on_text_next": "FIND_RECEIVED"
+    },
+
+    "FIND_EMAIL_ASK": {
+      "type": "text",
+      "body": "Mandame en un mensaje:\n\n- Email\n- DNI o Nombre y apellido\n- Qué querías consultar (póliza/pagos/siniestro)",
+      "on_text_next": "FIND_RECEIVED"
+    },
+
+    "FIND_NONE_TEXT": {
+      "type": "text",
+      "body": "Ok 👍\nDejame en un mensaje:\n- tu nombre\n- motivo (póliza/pagos/siniestro)\n- y cuándo te viene bien retomar\n\nCuando tengas algún dato (DNI, patente o póliza), lo sumás y avanzamos más rápido.",
+      "on_text_next": "FIND_RECEIVED"
+    },
+
+    "FIND_RECEIVED": {
+      "type": "interactive_list",
+      "body": "Recibido ✅\nCon esto ya podemos buscar tu información.\n\nSi querés, antes de escalar a un humano probemos una cosa más: ¿querés volver al menú o dejar el caso en revisión?",
+      "list": {
+        "header": "COBERSER - Seguimiento",
+        "button_text": "Elegir",
+        "footer": "Buscamos minimizar derivaciones 🙂",
+        "sections": [
+          {
+            "title": "Opciones",
+            "rows": [
+              { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú", "description": "Hacer otra consulta" },
+              { "id": "CASE_REVIEW", "title": "Dejar en revisión", "description": "Que lo vea el equipo y respondan" }
+            ]
+          },
+          {
+            "title": "Último recurso",
+            "rows": [
+              { "id": "HUMANO_LAST", "title": "Hablar con un asesor", "description": "Solo si no se pudo resolver" }
+            ]
+          }
+        ]
+      },
+      "on_select_next": {
+        "VOLVER_CLIENT_MENU": "CLIENT_MENU",
+        "CASE_REVIEW": "CASE_REVIEW_TEXT",
+        "HUMANO_LAST": "HUMANO"
+      }
+    },
+
+    "CASE_REVIEW_TEXT": {
+      "type": "text",
+      "body": "Listo ✅\nDejé tu caso en revisión con la info que enviaste. Te respondemos por este WhatsApp.\n\nSi querés sumar documentación o aclaraciones, mandalas en un solo mensaje.",
+      "on_text_next": "CLIENT_MENU"
     },
 
     "HUMANO": {
       "type": "text",
-      "body": "Listo 😎 Te paso con un asesor.\nMientras, contame en 1 frase qué necesitás.",
-      "on_text_next": "MENU"
+      "body": "Ok. Voy a derivar tu caso a un asesor 👤\n\nMientras tanto, contame en *1 frase* qué necesitás y (si aplica) tu DNI + póliza/patente.\n\nEsto ayuda a que te respondan más rápido.",
+      "on_text_next": "END"
     },
 
-    "OTRO": {
+    "END": {
       "type": "text",
-      "body": "Perfecto. Contame tu consulta y te encamino.\n(Si es algo complejo, te derivo.)",
-      "on_text_next": "MENU"
+      "body": "Gracias por escribir a COBERSER 🙌\nSi necesitás algo más, podés volver a escribir en cualquier momento."
     }
   }
 }

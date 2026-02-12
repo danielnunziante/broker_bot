@@ -5,7 +5,6 @@
       "type": "interactive_buttons",
       "body": "Hola {{name}} 👋\nSoy el asistente de *COBERSER S.A.*\n\nAntes de empezar, ¿ya sos cliente?",
       "buttons": {
-        "header": "COBERSER - Inicio",
         "footer": "",
         "buttons": [
           { "id": "SOY_CLIENTE", "title": "Sí, soy cliente" },
@@ -26,7 +25,6 @@
       "type": "interactive_list",
       "body": "Genial 😊\n\nEn *COBERSER* trabajamos desde 2003 acompañando a personas y empresas con *soluciones de seguros patrimoniales*, *ART* y *Vida*, con el respaldo de compañías líderes del mercado.\n\n¿Sobre qué te interesa consultar?",
       "list": {
-        "header": "COBERSER - Nuevos clientes",
         "button_text": "Ver servicios",
         "footer": "Elegí lo más parecido a lo que buscás.",
         "sections": [
@@ -121,7 +119,6 @@
       "type": "interactive_buttons",
       "body": "¡Gracias! ✅\n\n¿Cómo preferís que te contactemos para avanzar con la cotización?",
       "buttons": {
-        "header": "COBERSER - Contacto",
         "footer": "Elegí una opción.",
         "buttons": [
           { "id": "CONTACT_WPP", "title": "Por WhatsApp" },
@@ -152,7 +149,6 @@
       "type": "interactive_buttons",
       "body": "Listo 🙌\nYa registré tu consulta. En breve te respondemos por este WhatsApp con opciones y/o preguntas finales.\n\n¿Querés hacer algo más ahora?",
       "buttons": {
-        "header": "COBERSER - Siguiente paso",
         "footer": "Podés volver cuando quieras.",
         "buttons": [
           { "id": "OTRO_SERVICIO", "title": "Otro servicio" },
@@ -173,7 +169,6 @@
       "type": "interactive_buttons",
       "body": "Perfecto ✅\nQuedó agendado para que un asesor te contacte en el horario que indicaste.\n\n¿Querés consultar otro servicio mientras tanto?",
       "buttons": {
-        "header": "COBERSER - Listo",
         "footer": "Gracias por escribirnos.",
         "buttons": [
           { "id": "OTRO_SERVICIO", "title": "Sí, otro servicio" },
@@ -194,7 +189,6 @@
       "type": "interactive_buttons",
       "body": "¡Gracias! ✅\nTe contactaremos por email con la propuesta o para pedirte algún dato adicional.\n\n¿Querés consultar otro servicio?",
       "buttons": {
-        "header": "COBERSER - Listo",
         "footer": "Seguimos cuando quieras.",
         "buttons": [
           { "id": "OTRO_SERVICIO", "title": "Sí, otro servicio" },
@@ -215,7 +209,6 @@
       "type": "interactive_list",
       "body": "Perfecto {{name}} ✅\n¿Qué necesitás consultar hoy?",
       "list": {
-        "header": "COBERSER - Clientes",
         "button_text": "Ver opciones",
         "footer": "Te voy a pedir algunos datos para ubicar tu caso.",
         "sections": [
@@ -257,7 +250,6 @@
       "type": "interactive_buttons",
       "body": "¡Gracias! ✅\nYa registré tu consulta de *estado de póliza* para que te respondamos con toda la información actualizada.\n\n¿Querés hacer otra consulta?",
       "buttons": {
-        "header": "COBERSER - Clientes",
         "footer": "Seguimos por acá.",
         "buttons": [
           { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú" },
@@ -280,7 +272,6 @@
       "type": "interactive_buttons",
       "body": "Listo ✅\nRegistré tu consulta de *pagos/cuotas*. Te respondemos con vencimientos, estado y medios de pago disponibles.\n\n¿Algo más?",
       "buttons": {
-        "header": "COBERSER - Clientes",
         "footer": "Gracias.",
         "buttons": [
           { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú" },
@@ -303,7 +294,6 @@
       "type": "interactive_buttons",
       "body": "Gracias ✅\nRegistré tu consulta del *estado de siniestro*. Te respondemos con el avance y los próximos pasos.\n\n¿Algo más?",
       "buttons": {
-        "header": "COBERSER - Clientes",
         "footer": "Seguimos en este chat.",
         "buttons": [
           { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú" },
@@ -320,7 +310,6 @@
       "type": "interactive_buttons",
       "body": "Vamos con el siniestro 🚨\nPrimero: ¿hay *lesionados*, riesgo inmediato o emergencia?",
       "buttons": {
-        "header": "COBERSER - Siniestros",
         "footer": "Si estás en peligro, priorizá tu seguridad.",
         "buttons": [
           { "id": "CLAIM_URGENT_YES", "title": "Sí, es urgente" },
@@ -347,7 +336,6 @@
       "type": "interactive_buttons",
       "body": "Recibido ✅\nRegistré el siniestro como *urgente* para gestión prioritaria.\n\n¿Querés seguir cargando más detalles ahora?",
       "buttons": {
-        "header": "COBERSER - Siniestros",
         "footer": "Si podés, ayuda mucho sumar datos/fotos.",
         "buttons": [
           { "id": "CLAIM_CONTINUE", "title": "Cargar más detalles" },
@@ -364,7 +352,6 @@
       "type": "interactive_list",
       "body": "¿De qué tipo es el siniestro?",
       "list": {
-        "header": "COBERSER - Nuevo siniestro",
         "button_text": "Elegir tipo",
         "footer": "Elegí el que aplique.",
         "sections": [
@@ -423,7 +410,6 @@
       "type": "interactive_buttons",
       "body": "Listo ✅\nRegistré tu *nuevo siniestro*.\n\nPara avanzar más rápido, si tenés *fotos, denuncia o documentación*, podés enviarlas en este chat.\n\n¿Querés hacer algo más?",
       "buttons": {
-        "header": "COBERSER - Siniestros",
         "footer": "Gracias por la info.",
         "buttons": [
           { "id": "VOLVER_CLIENT_MENU", "title": "Volver al menú" },
@@ -444,7 +430,6 @@
       "type": "interactive_list",
       "body": "No pasa nada 🙂\nProbemos ubicarte con otra combinación de datos.\n¿Qué tenés a mano?",
       "list": {
-        "header": "COBERSER - Buscar datos",
         "button_text": "Elegir",
         "footer": "Mientras más datos, mejor.",
         "sections": [
@@ -502,7 +487,6 @@
       "type": "interactive_list",
       "body": "Recibido ✅\nCon esto ya podemos buscar tu información.\n\nSi querés, antes de escalar a un humano probemos una cosa más: ¿querés volver al menú o dejar el caso en revisión?",
       "list": {
-        "header": "COBERSER - Seguimiento",
         "button_text": "Elegir",
         "footer": "Buscamos minimizar derivaciones 🙂",
         "sections": [

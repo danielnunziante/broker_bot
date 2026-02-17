@@ -1,4 +1,4 @@
-module broker_bot
+module flowly
 
 go 1.22
 

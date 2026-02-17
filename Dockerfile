@@ -7,14 +7,14 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/broker_bot ./.
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/flowly ./.
 
 # ---- run ----
 FROM alpine:3.20
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
 
-COPY --from=build /out/broker_bot /app/broker_bot
+COPY --from=build /out/flowly /app/flowly
 
 # Copiamos configs al contenedor
 COPY configs /app/configs
@@ -22,4 +22,4 @@ COPY configs /app/configs
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["/app/broker_bot"]
+CMD ["/app/flowly"]

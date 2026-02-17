@@ -168,6 +168,9 @@ type FlowState struct {
 	Type string `json:"type"` // "text" | "interactive_list" | "interactive_buttons"
 	Body string `json:"body"`
 
+	// Action: Nombre de la función a ejecutar en Go antes de renderizar (ej: "fetch_client_data", "check_calendar")
+	Action string `json:"action,omitempty"`
+
 	// Optional header media for interactive messages (e.g. image header)
 	HeaderMedia *FlowHeaderMedia `json:"header_media,omitempty"`
 
@@ -222,6 +225,8 @@ type FlowHeaderMedia struct {
 type UserSession struct {
 	State     string
 	UpdatedAt time.Time
+	// Agregamos un mapa de datos para guardar info del CRM, selecciones del usuario, etc.
+	Data map[string]string
 }
 
 type SessionStore struct {
@@ -887,15 +892,28 @@ func (a *App) handleMessage(w http.ResponseWriter, r *http.Request) {
 					name = "ahí"
 				}
 
+				// Inicializamos vars con datos básicos
 				vars := map[string]string{
 					"name": name,
 				}
 
 				sessKey := tenant + ":" + waID
 				sess, ok := a.sessions.Get(sessKey)
+				// Si no existe sesión o no tiene estado, inicializamos
 				if !ok || sess.State == "" {
-					sess = UserSession{State: "MENU", UpdatedAt: time.Now()}
+					sess = UserSession{
+						State:     "MENU",
+						UpdatedAt: time.Now(),
+						Data:      make(map[string]string), // Importante inicializar el mapa
+					}
 					a.sessions.Set(sessKey, sess)
+				}
+
+				// Si la sesión ya traía datos (Data), los sumamos a vars para que estén disponibles
+				if sess.Data != nil {
+					for k, v := range sess.Data {
+						vars[k] = v
+					}
 				}
 
 				log.Printf("🤖 tenant=%s wa_id=%s state=%s type=%s name=%s", tenant, waID, sess.State, msg.Type, name)
@@ -906,6 +924,30 @@ func (a *App) handleMessage(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
+				// ---------------------------------------------------------
+				// NUEVO BLOQUE: CAPTURAR SELECCIÓN INTERACTIVA (SLOTS)
+				// ---------------------------------------------------------
+				// Si el mensaje es una respuesta a botón o lista, guardamos el ID
+				// en la sesión ANTES de calcular el próximo estado.
+				if msg.Type == "interactive" && msg.Interactive != nil {
+					selectedID := ""
+					if msg.Interactive.ListReply != nil {
+						selectedID = msg.Interactive.ListReply.ID
+					} else if msg.Interactive.ButtonReply != nil {
+						selectedID = msg.Interactive.ButtonReply.ID
+					}
+
+					if selectedID != "" {
+						if sess.Data == nil {
+							sess.Data = make(map[string]string)
+						}
+						sess.Data["last_selected_id"] = selectedID
+						log.Printf("💾 Guardando selección del usuario: %s", selectedID)
+					}
+				}
+				// ---------------------------------------------------------
+
+				// 1. Determinamos el siguiente estado según el input del usuario
 				nextState, handled, err := a.processMessage(tenant, sess.State, msg)
 				if err != nil {
 					log.Printf("ERROR procesando msg: %v", err)
@@ -917,8 +959,61 @@ func (a *App) handleMessage(w http.ResponseWriter, r *http.Request) {
 					nextState = "MENU"
 				}
 
-				a.sessions.Set(sessKey, UserSession{State: nextState, UpdatedAt: time.Now()})
+				// ---------------------------------------------------------
+				// NUEVA LÓGICA: EJECUCIÓN DE ACCIONES (The Action Pattern)
+				// ---------------------------------------------------------
 
+				// Recuperamos la config para ver si el nextState tiene una Action asociada
+				cfg, ok := a.cache.Get(tenant)
+				if !ok {
+					// Si por alguna razón no está en caché (raro), intentamos recargar
+					loaded, errLoad := loadFlowConfig(tenant)
+					if errLoad == nil {
+						cfg = loaded
+						a.cache.Set(tenant, loaded)
+					}
+				}
+
+				// Buscamos si el próximo estado tiene una acción definida
+				targetSt, exists := cfg.States[nextState]
+
+				// Si el estado existe y tiene una Action definida...
+				if exists && targetSt.Action != "" {
+					log.Printf("⚡ Ejecutando acción: %s [Estado: %s]", targetSt.Action, nextState)
+
+					// Buscamos la función en el registro
+					if fn, found := actionRegistry[targetSt.Action]; found {
+						// Ejecutamos la acción pasándole el contexto
+						newVars, errAction := fn(tenant, waID, &sess)
+
+						if errAction != nil {
+							log.Printf("❌ Error ejecutando acción %s: %v", targetSt.Action, errAction)
+							// Opcional: Podrías forzar nextState = "ERROR_STATE" aquí si quisieras
+						} else {
+							// Merge de variables nuevas
+							if sess.Data == nil {
+								sess.Data = make(map[string]string)
+							}
+							for k, v := range newVars {
+								// 1. Disponibles para el render inmediato
+								vars[k] = v
+								// 2. Persistentes en la sesión del usuario
+								sess.Data[k] = v
+							}
+						}
+					} else {
+						log.Printf("⚠️ Acción definida en JSON pero no en código: %s", targetSt.Action)
+					}
+				}
+
+				// ---------------------------------------------------------
+
+				// Guardamos la sesión actualizada (Nuevo Estado + Nuevos Datos en Data)
+				sess.State = nextState
+				sess.UpdatedAt = time.Now()
+				a.sessions.Set(sessKey, sess)
+
+				// Renderizamos y enviamos el mensaje
 				if err := a.renderer.RenderAndSend(tenant, nextState, waClient, waID, vars); err != nil {
 					log.Printf("ERROR render %s: %v", nextState, err)
 					_ = waClient.sendText(waID, "Perdón, hubo un problema mostrando el menú.")
@@ -1006,6 +1101,46 @@ func (a *App) processMessage(tenant string, state string, msg IncomingMessage) (
 	}
 }
 
+func actionScheduleAppointment(tenant, userID string, sess *UserSession) (map[string]string, error) {
+	// 1. Recuperamos qué botón apretó el usuario (lo guardamos recién en handleMessage)
+	selectedID := sess.Data["last_selected_id"] // Ej: "SLOT_1"
+
+	// 2. Recuperamos el valor ISO oculto asociado a ese botón (lo guardó get_calendar_slots)
+	// Ej: si elegiste SLOT_1, buscamos SLOT_1_ISO
+	isoDate := sess.Data[selectedID+"_ISO"]
+
+	if isoDate == "" {
+		log.Printf("❌ No se encontró fecha para el ID: %s. Datos en sesión: %v", selectedID, sess.Data)
+		return nil, fmt.Errorf("no seleccionaste un horario válido o expiró la sesión")
+	}
+
+	// 3. Instanciamos el servicio de calendario
+	svc, err := NewCalendarService(tenant)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Datos del paciente
+	name := sess.Data["name"]
+	if clientName, ok := sess.Data["client_name"]; ok && clientName != "" {
+		name = clientName
+	}
+
+	log.Printf("📅 Agendando turno real en Google para %s en %s", name, isoDate)
+
+	// 5. Llamamos a Google Calendar
+	err = svc.CreateAppointment(isoDate, name, userID) // userID es el teléfono
+	if err != nil {
+		log.Printf("❌ Error creando evento en Google: %v", err)
+		return nil, fmt.Errorf("error al agendar en Google")
+	}
+
+	// Devolvemos variables para mostrar en el mensaje de confirmación
+	return map[string]string{
+		"appointment_confirm_time": isoDate,
+	}, nil
+}
+
 // ---------------------
 // Tenant assets (served from /configs/{tenant}/assets/* via public route)
 // ---------------------
@@ -1053,6 +1188,86 @@ func (a *App) handleTenantAssets(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	http.ServeFile(w, r, absFile)
+}
+
+// ActionFunc define la firma de nuestras acciones.
+// Recibe el tenant, el ID del usuario, y la sesión actual.
+// Devuelve un mapa de variables nuevas para inyectar en el template o un error.
+type ActionFunc func(tenant, userID string, session *UserSession) (map[string]string, error)
+
+var actionRegistry = map[string]ActionFunc{
+	"mock_crm_lookup":      actionMockCRMLookup,
+	"get_calendar_slots":   actionGetCalendarSlots,
+	"schedule_appointment": actionScheduleAppointment,
+}
+
+// --- Implementación Mock del CRM ---
+
+func actionMockCRMLookup(tenant, userID string, sess *UserSession) (map[string]string, error) {
+	// SIMULAMOS una llamada a base de datos
+	// En la vida real, acá harías: SELECT * FROM users WHERE phone = userID
+
+	log.Printf("🔍 Buscando usuario %s en CRM simulado...", userID)
+
+	// Simulamos que si el número termina en par, es cliente. Si es impar, es nuevo.
+	// (Un hack rápido para probar flujos distintos con distintos celulares)
+	esCliente := false
+	if len(userID) > 0 {
+		lastDigit := userID[len(userID)-1]
+		if int(lastDigit)%2 == 0 {
+			esCliente = true
+		}
+	}
+
+	vars := make(map[string]string)
+	if esCliente {
+		vars["is_client"] = "true"
+		vars["client_name"] = "Carlos (Cliente VIP)" // Dato traído del "CRM"
+		vars["last_visit"] = "15 de Febrero"
+	} else {
+		vars["is_client"] = "false"
+		vars["client_name"] = "Visitante"
+	}
+
+	return vars, nil
+}
+
+func actionGetCalendarSlots(tenant, userID string, sess *UserSession) (map[string]string, error) {
+	log.Println("📅 Consultando Google Calendar real...")
+
+	// 1. Instanciamos el servicio (busca calendar.json del tenant)
+	svc, err := NewCalendarService(tenant)
+	if err != nil {
+		log.Printf("ERROR Calendar Init: %v", err)
+		return map[string]string{"slot_1": "Error Config"}, nil
+	}
+
+	// 2. Pedimos los slots libres a Google
+	slots, err := svc.GetNextAvailableSlots()
+	if err != nil {
+		log.Printf("ERROR Calendar Query: %v", err)
+		return map[string]string{"slot_1": "Sin sistema"}, nil
+	}
+
+	vars := make(map[string]string)
+
+	// Limpiamos variables viejas para que no queden botones rotos
+	vars["slot_1"] = "Sin cupo"
+	vars["slot_2"] = "-"
+	vars["slot_3"] = "-"
+
+	// 3. Rellenamos las variables
+	for i, s := range slots {
+		// Variable visible en el botón (ej: "Lun 18 10:00")
+		keyText := fmt.Sprintf("slot_%d", i+1)
+		vars[keyText] = s.Text
+
+		// Variable OCULTA con la fecha real (ej: "2026-02-18T10:00:00Z")
+		// Esta es la que usa schedule_appointment
+		vars[fmt.Sprintf("%s_ISO", s.ID)] = s.ISOValue
+	}
+
+	return vars, nil
 }
 
 // ---------------------

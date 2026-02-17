@@ -1,0 +1,100 @@
+{
+    "version": "1.0",
+    "states": {
+        "MENU": {
+            "type": "text",
+            "body": "Hola {{name}} 👋 bienvenido a *Clínica Demo Flowly*.\n\nAguarda un instante, estoy verificando si sos paciente...",
+            "on_text_next": "ROUTER_CRM"
+        },
+        "ROUTER_CRM": {
+            "type": "interactive_buttons",
+            "action": "mock_crm_lookup",
+            "body": "Sistema: Verificación completada.\nResultado: ¿Es cliente? {{is_client}}\nNombre registrado: {{client_name}}\n\n(Este mensaje es interno para debug, ahora derivamos al usuario)",
+            "buttons": {
+                "footer": "Debug Mode",
+                "buttons": [
+                    {
+                        "id": "NEXT",
+                        "title": "Continuar"
+                    }
+                ]
+            },
+            "on_select_next": {
+                "NEXT": "WELCOME_LOGIC"
+            }
+        },
+        "WELCOME_LOGIC": {
+            "type": "interactive_buttons",
+            "body": "Hola de nuevo {{client_name}}. ¿En qué te podemos ayudar hoy?",
+            "buttons": {
+                "footer": "Seleccioná una opción",
+                "buttons": [
+                    {
+                        "id": "AGENDAR",
+                        "title": "📅 Nuevo Turno"
+                    },
+                    {
+                        "id": "URGENCIA",
+                        "title": "🚨 Urgencia"
+                    }
+                ]
+            },
+            "on_select_next": {
+                "AGENDAR": "SELECT_DATE",
+                "URGENCIA": "HUMAN_HANDOFF"
+            }
+        },
+        "SELECT_DATE": {
+            "type": "interactive_list",
+            "action": "get_calendar_slots",
+            "body": "Perfecto, estos son los turnos disponibles traídos de Google Calendar (Simulado):",
+            "list": {
+                "header": "Agenda",
+                "footer": "Horarios disponibles",
+                "button_text": "Ver horarios",
+                "sections": [
+                    {
+                        "title": "Próximos turnos",
+                        "rows": [
+                            {
+                                "id": "SLOT_1",
+                                "title": "Opción 1",
+                                "description": "{{slot_1}}"
+                            },
+                            {
+                                "id": "SLOT_2",
+                                "title": "Opción 2",
+                                "description": "{{slot_2}}"
+                            },
+                            {
+                                "id": "SLOT_3",
+                                "title": "Opción 3",
+                                "description": "{{slot_3}}"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "on_select_next": {
+                "SLOT_1": "CONFIRM_APPOINTMENT",
+                "SLOT_2": "CONFIRM_APPOINTMENT",
+                "SLOT_3": "CONFIRM_APPOINTMENT"
+            }
+        },
+        "CONFIRM_APPOINTMENT": {
+            "type": "text",
+            "action": "schedule_appointment",
+            "body": "✅ ¡Listo! Turno confirmado.\n\nPaciente: {{name}}\nFecha (ISO): {{appointment_confirm_time}}\n\nTe llegará la invitación de Google Calendar a tu email si lo tenemos, o un recordatorio por acá.",
+            "on_text_next": "END"
+        },
+        "HUMAN_HANDOFF": {
+            "type": "text",
+            "body": "Entendido. Estoy derivando tu caso a un agente humano 👤.\n\nUn asesor te escribirá desde este mismo chat en breve.",
+            "on_text_next": "END"
+        },
+        "END": {
+            "type": "text",
+            "body": "Gracias por usar la demo de Flowly."
+        }
+    }
+}
